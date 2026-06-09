@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이순신 — 불멸의 수군 제독</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700;900&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        ink:    '#0e0f0d',
+        stone:  '#1c1e1a',
+        bark:   '#2a2c27',
+        mist:   '#e8e2d6',
+        parch:  '#f2edd8',
+        gold:   '#c9963a',
+        rust:   '#8b3a2a',
+        sea:    '#2d4a5e',
+      },
+      fontFamily: {
+        serif: ['"Noto Serif KR"', 'Georgia', 'serif'],
+        sans:  ['"Noto Sans KR"', 'sans-serif'],
+      },
+    }
+  }
+}
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background: #0e0f0d; }
+
+  /* nav scroll effect */
+  #nav { transition: background 0.3s, backdrop-filter 0.3s; }
+  #nav.scrolled { background: rgba(14,15,13,0.92); backdrop-filter: blur(12px); }
+
+  /* hero ink brush stroke accent */
+  .brush-line {
+    display: inline-block;
+    position: relative;
+  }
+  .brush-line::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -4px;
+    width: 100%; height: 3px;
+    background: #c9963a;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.6s ease;
+  }
+  .brush-line.visible::after { transform: scaleX(1); }
+
+  /* timeline vertical line */
+  .tl-line { border-left: 2px solid rgba(201,150,58,0.25); }
+
+  /* stat counter */
+  .stat-num { font-variant-numeric: tabular-nums; }
+
+  /* battle map popup override */
+  .leaflet-popup-content-wrapper {
+    background: #1c1e1a !important;
+    border: 1px solid rgba(201,150,58,0.4) !important;
+    border-radius: 8px !important;
+    color: #e8e2d6 !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  }
+  .leaflet-popup-tip { background: #1c1e1a !important; }
+  .leaflet-popup-content { margin: 12px 16px !important; font-family: 'Noto Sans KR', sans-serif; }
+  .leaflet-control-zoom a {
+    background: #1c1e1a !important;
+    color: #c9963a !important;
+    border-color: rgba(201,150,58,0.3) !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(14,15,13,0.8) !important;
+    color: rgba(232,226,214,0.35) !important;
+    font-size: 9px !important;
+  }
+  .leaflet-tile-pane { filter: saturate(0.4) brightness(0.65) sepia(0.3); }
+
+  /* quote aside bar */
+  .quote-bar { border-left: 3px solid #c9963a; }
+
+  /* section fade-in */
+  .fade-section { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .fade-section.visible { opacity: 1; transform: translateY(0); }
+
+  /* mobile menu */
+  #mobile-menu { transition: max-height 0.3s ease, opacity 0.3s ease; max-height: 0; opacity: 0; overflow: hidden; }
+  #mobile-menu.open { max-height: 300px; opacity: 1; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0e0f0d; }
+  ::-webkit-scrollbar-thumb { background: #c9963a; border-radius: 2px; }
+</style>
+</head>
+<body class="font-sans text-mist">
+
+<!-- NAV -->
+<nav id="nav" class="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+  <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <span class="font-serif text-gold font-bold text-lg tracking-widest">李舜臣</span>
+    <div class="hidden md:flex gap-8 text-sm text-mist/70 tracking-wide">
+      <a href="#about"    class="hover:text-gold transition-colors">소개</a>
+      <a href="#stats"    class="hover:text-gold transition-colors">전과</a>
+      <a href="#timeline" class="hover:text-gold transition-colors">연보</a>
+      <a href="#battles"  class="hover:text-gold transition-colors">해전</a>
+      <a href="#quotes"   class="hover:text-gold transition-colors">어록</a>
+      <a href="#map"      class="hover:text-gold transition-colors">지도</a>
+    </div>
+    <button id="menu-btn" class="md:hidden text-mist/70 hover:text-gold" onclick="document.getElementById('mobile-menu').classList.toggle('open')">
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+  </div>
+  <div id="mobile-menu" class="md:hidden max-w-6xl mx-auto">
+    <div class="flex flex-col gap-4 pt-4 pb-2 text-sm text-mist/70 tracking-wide border-t border-white/10 mt-3">
+      <a href="#about"    onclick="document.getElementById('mobile-menu').classList.remove('open')">소개</a>
+      <a href="#stats"    onclick="document.getElementById('mobile-menu').classList.remove('open')">전과</a>
+      <a href="#timeline" onclick="document.getElementById('mobile-menu').classList.remove('open')">연보</a>
+      <a href="#battles"  onclick="document.getElementById('mobile-menu').classList.remove('open')">해전</a>
+      <a href="#quotes"   onclick="document.getElementById('mobile-menu').classList.remove('open')">어록</a>
+      <a href="#map"      onclick="document.getElementById('mobile-menu').classList.remove('open')">지도</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden bg-ink">
+  <!-- Background texture grid -->
+  <div class="absolute inset-0 opacity-5" style="background-image: repeating-linear-gradient(0deg,transparent,transparent 59px,rgba(201,150,58,0.6) 59px,rgba(201,150,58,0.6) 60px), repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(201,150,58,0.6) 59px,rgba(201,150,58,0.6) 60px);"></div>
+  <!-- Radial fade -->
+  <div class="absolute inset-0" style="background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(45,74,94,0.18) 0%, transparent 70%);"></div>
+
+  <div class="relative z-10 text-center px-6 max-w-4xl mx-auto">
+    <p class="text-gold/70 text-xs tracking-[0.35em] uppercase font-sans mb-6">1545 — 1598 · 조선의 수군 제독</p>
+    <h1 class="font-serif font-black text-parch leading-none mb-2" style="font-size:clamp(3.5rem,10vw,8rem); letter-spacing:-0.02em;">
+      이순신
+    </h1>
+    <p class="font-serif text-gold/80 text-xl md:text-2xl mb-8 tracking-widest">李舜臣 · Admiral Yi Sun-sin</p>
+    <p class="text-mist/60 text-base md:text-lg font-light leading-relaxed max-w-2xl mx-auto mb-12">
+      단 한 번도 패배하지 않은 바다의 영웅.<br>
+      23전 23승, 임진왜란의 흐름을 바꾼 불패의 제독.
+    </p>
+    <a href="#about" class="inline-block border border-gold/50 text-gold/80 hover:bg-gold hover:text-ink text-sm px-8 py-3 tracking-widest transition-all duration-300 font-sans">
+      더 알아보기
+    </a>
+  </div>
+
+  <!-- Scroll indicator -->
+  <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-mist/30 text-xs tracking-widest">
+    <span>SCROLL</span>
+    <div class="w-px h-10 bg-gold/30 animate-pulse"></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about" class="fade-section py-28 px-6 bg-stone">
+  <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+    <div>
+      <p class="text-gold/60 text-xs tracking-[0.3em] uppercase mb-4">소개</p>
+      <h2 class="font-serif text-4xl text-parch font-bold mb-8 leading-tight">바다를 지킨<br>불패의 장군</h2>
+      <div class="space-y-5 text-mist/70 text-sm leading-8">
+        <p>이순신(李舜臣, 1545~1598)은 조선 중기의 무신으로, 임진왜란 당시 삼도수군통제사로서 조선 수군을 이끌었다. 그는 23번의 해전에서 단 한 번도 패배하지 않은 세계 해전사에 유례없는 기록을 남겼다.</p>
+        <p>전라좌수사로 부임한 뒤 전쟁 발발 이전부터 거북선(龜船)을 개발하고 수군을 훈련시키며 철저한 전쟁 준비를 했다. 학익진(鶴翼陣) 등 독창적 전술로 열세를 뒤집었으며, 명량대첩에서는 단 13척으로 왜선 330여 척을 격퇴하는 기적을 이뤘다.</p>
+        <p>1598년 노량해전에서 도주하는 왜군을 추격하다 유탄에 맞아 전사했다. "싸움이 급하니 내가 죽었다는 말을 하지 말라"는 유언은 오늘날까지 전해진다.</p>
+      </div>
+    </div>
+    <div class="space-y-4">
+      <div class="bg-bark rounded-sm p-6 border-l-2 border-gold/60">
+        <p class="text-gold/60 text-xs tracking-widest uppercase mb-1 font-sans">출생</p>
+        <p class="font-serif text-parch text-lg">1545년 3월 8일</p>
+        <p class="text-mist/50 text-sm">한성부 건천동 (현 서울 중구)</p>
+      </div>
+      <div class="bg-bark rounded-sm p-6 border-l-2 border-gold/60">
+        <p class="text-gold/60 text-xs tracking-widest uppercase mb-1 font-sans">전사</p>
+        <p class="font-serif text-parch text-lg">1598년 11월 19일</p>
+        <p class="text-mist/50 text-sm">노량 해협 (현 경남 남해군)</p>
+      </div>
+      <div class="bg-bark rounded-sm p-6 border-l-2 border-gold/60">
+        <p class="text-gold/60 text-xs tracking-widest uppercase mb-1 font-sans">최종 직위</p>
+        <p class="font-serif text-parch text-lg">삼도수군통제사</p>
+        <p class="text-mist/50 text-sm">전라·경상·충청 수군 총사령관</p>
+      </div>
+      <div class="bg-bark rounded-sm p-6 border-l-2 border-rust/70">
+        <p class="text-rust/80 text-xs tracking-widest uppercase mb-1 font-sans">사후 추증</p>
+        <p class="font-serif text-parch text-lg">의정부 영의정 · 덕풍부원군</p>
+        <p class="text-mist/50 text-sm">1643년 충무공(忠武公) 시호 추서</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section id="stats" class="fade-section py-24 px-6 bg-ink">
+  <div class="max-w-5xl mx-auto">
+    <p class="text-gold/60 text-xs tracking-[0.3em] uppercase mb-4 text-center">전과 기록</p>
+    <h2 class="font-serif text-3xl text-parch font-bold mb-16 text-center">숫자로 보는 이순신</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/5 rounded-sm overflow-hidden">
+      <div class="bg-stone p-8 text-center">
+        <p class="stat-num font-serif text-5xl font-black text-gold mb-2">23</p>
+        <p class="text-xs text-mist/50 tracking-widest uppercase">전 승리</p>
+        <p class="text-mist/40 text-xs mt-1">23전 23승</p>
+      </div>
+      <div class="bg-stone p-8 text-center">
+        <p class="stat-num font-serif text-5xl font-black text-gold mb-2">0</p>
+        <p class="text-xs text-mist/50 tracking-widest uppercase">패배</p>
+        <p class="text-mist/40 text-xs mt-1">단 한 척도 잃지 않은 해전 다수</p>
+      </div>
+      <div class="bg-stone p-8 text-center">
+        <p class="stat-num font-serif text-5xl font-black text-gold mb-2">13</p>
+        <p class="text-xs text-mist/50 tracking-widest uppercase">명량 출전 전선</p>
+        <p class="text-mist/40 text-xs mt-1">vs 왜선 330여 척</p>
+      </div>
+      <div class="bg-stone p-8 text-center">
+        <p class="stat-num font-serif text-5xl font-black text-gold mb-2">400<span class="text-2xl">+</span></p>
+        <p class="text-xs text-mist/50 tracking-widest uppercase">격파 왜선 (추산)</p>
+        <p class="text-mist/40 text-xs mt-1">임진·정유 재란 합산</p>
+      </div>
+    </div>
+    <!-- 3대첩 -->
+    <div class="mt-12 grid md:grid-cols-3 gap-6">
+      <div class="bg-bark/60 border border-gold/20 rounded-sm p-6">
+        <p class="text-gold text-xs tracking-widest uppercase mb-3">제1대첩</p>
+        <h3 class="font-serif text-parch text-xl font-bold mb-2">한산도대첩</h3>
+        <p class="text-mist/50 text-xs mb-3">1592년 7월 8일</p>
+        <p class="text-mist/65 text-sm leading-7">학익진 전술로 왜선 59척 격파. 일본의 서해 진출을 완전히 차단해 전쟁의 흐름을 바꾼 결정적 승리.</p>
+      </div>
+      <div class="bg-bark/60 border border-gold/20 rounded-sm p-6">
+        <p class="text-gold text-xs tracking-widest uppercase mb-3">제2대첩</p>
+        <h3 class="font-serif text-parch text-xl font-bold mb-2">명량대첩</h3>
+        <p class="text-mist/50 text-xs mb-3">1597년 9월 16일</p>
+        <p class="text-mist/65 text-sm leading-7">단 13척으로 330여 척 격퇴, 31척 격침. 명량 해협의 조류와 지형을 이용한 세계 해전사 최고의 역전극.</p>
+      </div>
+      <div class="bg-bark/60 border border-gold/20 rounded-sm p-6">
+        <p class="text-gold text-xs tracking-widest uppercase mb-3">제3대첩 · 마지막 전투</p>
+        <h3 class="font-serif text-parch text-xl font-bold mb-2">노량해전</h3>
+        <p class="text-mist/50 text-xs mb-3">1598년 11월 19일</p>
+        <p class="text-mist/65 text-sm leading-7">왜선 200여 척 격파하며 왜군 퇴로 차단. 전투 중 유탄에 맞아 전사. 조선의 최종 승리로 임진왜란 종결.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section id="timeline" class="fade-section py-28 px-6 bg-stone">
+  <div class="max-w-3xl mx-auto">
+    <p class="text-gold/60 text-xs tracking-[0.3em] uppercase mb-4">연보</p>
+    <h2 class="font-serif text-3xl text-parch font-bold mb-16">이순신의 생애</h2>
+    <div class="tl-line pl-8 space-y-0">
+      <!-- items -->
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-gold border-2 border-stone"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1545</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">한성부 건천동 출생</h3>
+        <p class="text-mist/50 text-sm leading-7">덕수 이씨 가문에서 태어남. 어린 시절부터 무예를 익히고 병서를 탐독.</p>
+      </div>
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-bark border-2 border-gold/40"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1576</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">무과 급제 (32세)</h3>
+        <p class="text-mist/50 text-sm leading-7">식년 무과에 합격. 함경도 동구비보 권관으로 첫 군 복무 시작.</p>
+      </div>
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-bark border-2 border-gold/40"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1591</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">전라좌수사 부임</h3>
+        <p class="text-mist/50 text-sm leading-7">류성룡의 천거로 전라좌수사 임명. 거북선 건조 시작, 수군 훈련 강화.</p>
+      </div>
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-gold border-2 border-stone"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1592</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">임진왜란 발발 — 연속 대승</h3>
+        <p class="text-mist/50 text-sm leading-7">옥포·사천·당포·한산도 등 연속 대승. 7월 한산도대첩으로 남해 제해권 완전 장악.</p>
+      </div>
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-bark border-2 border-gold/40"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1593</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">삼도수군통제사 초대 임명</h3>
+        <p class="text-mist/50 text-sm leading-7">삼도수군통제사직 신설과 동시에 초대 통제사로 임명. 한산도에 통제영 설치.</p>
+      </div>
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-rust border-2 border-stone"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1597</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">파직·투옥 — 원균의 칠천량 참패</h3>
+        <p class="text-mist/50 text-sm leading-7">모함으로 파직·투옥. 후임 원균이 칠천량에서 전멸에 가까운 패배. 백의종군 후 재임명.</p>
+      </div>
+      <div class="relative pb-10">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-gold border-2 border-stone"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1597. 9</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">명량대첩</h3>
+        <p class="text-mist/50 text-sm leading-7">전선 13척으로 왜선 330여 척을 명량 해협에서 격파. 세계 해전사 최고의 역전 승리.</p>
+      </div>
+      <div class="relative pb-2">
+        <div class="absolute -left-[41px] w-4 h-4 rounded-full bg-rust border-2 border-stone"></div>
+        <p class="text-gold/70 text-xs tracking-widest font-sans mb-1">1598. 11. 19</p>
+        <h3 class="font-serif text-parch text-base font-semibold mb-1">노량해전 — 전사</h3>
+        <p class="text-mist/50 text-sm leading-7">"싸움이 급하니 내가 죽었다는 말을 하지 말라." 마지막 말을 남기고 유탄에 맞아 54세로 전사.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BATTLES TABLE -->
+<section id="battles" class="fade-section py-28 px-6 bg-ink">
+  <div class="max-w-5xl mx-auto">
+    <p class="text-gold/60 text-xs tracking-[0.3em] uppercase mb-4">주요 해전</p>
+    <h2 class="font-serif text-3xl text-parch font-bold mb-4">23전 23승의 기록</h2>
+    <p class="text-mist/50 text-sm mb-12">칠천량해전은 원균 지휘 하의 패전으로 이순신 부재 시 기록</p>
+    <div class="overflow-x-auto rounded-sm border border-white/5">
+      <table class="w-full text-sm min-w-[640px]">
+        <thead>
+          <tr class="bg-bark text-mist/50 text-xs tracking-widest uppercase">
+            <th class="px-5 py-4 text-left font-normal w-8">#</th>
+            <th class="px-5 py-4 text-left font-normal">해전명</th>
+            <th class="px-5 py-4 text-left font-normal">날짜</th>
+            <th class="px-5 py-4 text-left font-normal">결과</th>
+            <th class="px-5 py-4 text-left font-normal hidden md:table-cell">전과</th>
+          </tr>
+        </thead>
+        <tbody id="battle-table"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- QUOTES -->
+<section id="quotes" class="fade-section py-28 px-6 bg-stone">
+  <div class="max-w-4xl mx-auto">
+    <p class="text-gold/60 text-xs tracking-[0.3em] uppercase mb-4 text-center">어록</p>
+    <h2 class="font-serif text-3xl text-parch font-bold mb-16 text-center">이순신의 말</h2>
+    <div class="grid md:grid-cols-2 gap-8">
+      <blockquote class="quote-bar pl-6">
+        <p class="font-serif text-parch text-lg leading-9 mb-4">"죽고자 하면 살고, 살고자 하면 죽는다."</p>
+        <cite class="text-mist/40 text-xs tracking-widest not-italic">— 명량해전 전야 훈시</cite>
+      </blockquote>
+      <blockquote class="quote-bar pl-6">
+        <p class="font-serif text-parch text-lg leading-9 mb-4">"싸움이 이제 급하다. 내가 죽었다는 말을 하지 말라."</p>
+        <cite class="text-mist/40 text-xs tracking-widest not-italic">— 노량해전 최후의 유언</cite>
+      </blockquote>
+      <blockquote class="quote-bar pl-6">
+        <p class="font-serif text-parch text-lg leading-9 mb-4">"신에게는 아직 열두 척의 전선이 있습니다."</p>
+        <cite class="text-mist/40 text-xs tracking-widest not-italic">— 선조에게 올린 장계 (명량 전)</cite>
+      </blockquote>
+      <blockquote class="quote-bar pl-6">
+        <p class="font-serif text-parch text-lg leading-9 mb-4">"나라를 위해 간담을 씻어 충성을 다하겠나이다."</p>
+        <cite class="text-mist/40 text-xs tracking-widest not-italic">— 난중일기</cite>
+      </blockquote>
+    </div>
+    <div class="mt-16 bg-bark/50 border border-gold/15 rounded-sm p-8 text-center">
+      <p class="text-gold/60 text-xs tracking-widest uppercase mb-3">난중일기 (亂中日記)</p>
+      <p class="font-serif text-parch text-base leading-8 max-w-2xl mx-auto text-mist/70">이순신은 1592년부터 1598년까지 7년간 전장에서 일기를 썼다. 난중일기는 2013년 유네스코 세계기록유산으로 등재되었으며, 한 장수의 내면과 전쟁의 실상을 생생하게 전하는 불후의 기록이다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section id="map" class="fade-section py-20 px-6 bg-ink">
+  <div class="max-w-6xl mx-auto">
+    <p class="text-gold/60 text-xs tracking-[0.3em] uppercase mb-4">실시간 해전 경로</p>
+    <h2 class="font-serif text-3xl text-parch font-bold mb-2">이순신의 바다</h2>
+    <p class="text-mist/50 text-sm mb-6">재생 버튼을 누르면 1592년부터 1598년까지 해전 경로를 순서대로 따라갑니다.</p>
+
+    <!-- Controls -->
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <button id="btn-play" onclick="togglePlay()" class="flex items-center gap-2 px-5 py-2 text-sm font-sans tracking-wide border border-gold/50 text-gold hover:bg-gold hover:text-ink transition-all duration-200">
+        <svg id="icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        <span id="btn-label">재생</span>
+      </button>
+      <button onclick="resetRoute()" class="flex items-center gap-2 px-5 py-2 text-sm font-sans tracking-wide border border-white/20 text-mist/60 hover:border-white/40 hover:text-mist transition-all duration-200">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+        처음부터
+      </button>
+
+      <!-- Speed -->
+      <div class="flex items-center gap-2 ml-2">
+        <span class="text-xs text-mist/40 tracking-widest">속도</span>
+        <button onclick="setSpeed(2000)" id="spd-slow"  class="text-xs px-3 py-1 border border-white/15 text-mist/40 hover:border-gold/40 hover:text-gold transition-all">느리게</button>
+        <button onclick="setSpeed(1000)" id="spd-mid"   class="text-xs px-3 py-1 border border-gold/40 text-gold transition-all">보통</button>
+        <button onclick="setSpeed(400)"  id="spd-fast"  class="text-xs px-3 py-1 border border-white/15 text-mist/40 hover:border-gold/40 hover:text-gold transition-all">빠르게</button>
+      </div>
+
+      <!-- Legend -->
+      <div class="flex items-center gap-4 ml-auto text-xs text-mist/40 flex-wrap">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#c9963a;border:2px solid #f0d070"></span>승전</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#8b3a2a;border:2px solid #e74c3c"></span>패전</span>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="relative mb-3">
+      <div class="w-full h-1 bg-white/8 rounded-full overflow-hidden cursor-pointer" id="progress-track" onclick="seekTo(event)">
+        <div id="progress-bar" class="h-full rounded-full transition-none" style="width:0%;background:#c9963a;"></div>
+      </div>
+      <div class="flex justify-between mt-1 text-xs text-mist/30 font-mono">
+        <span>1592</span><span>1594</span><span>1597</span><span>1598</span>
+      </div>
+    </div>
+
+    <!-- Current battle info card -->
+    <div id="battle-card" class="mb-4 bg-bark/70 border border-gold/20 rounded-sm px-5 py-3 flex items-center gap-5 min-h-[56px] transition-all duration-300">
+      <div id="card-num" class="font-mono text-2xl font-black text-gold/30 w-8 text-center shrink-0">—</div>
+      <div class="flex-1">
+        <div class="flex items-center gap-3 mb-0.5">
+          <span id="card-name" class="font-serif text-parch font-bold text-base">재생을 눌러 경로를 시작하세요</span>
+          <span id="card-badge" class="hidden text-xs px-2 py-0.5 rounded-sm border"></span>
+        </div>
+        <div class="flex gap-4 text-xs text-mist/45">
+          <span id="card-year"></span>
+          <span id="card-ships"></span>
+        </div>
+      </div>
+      <div id="card-desc" class="hidden md:block text-xs text-mist/50 leading-6 max-w-xs"></div>
+    </div>
+
+    <!-- Map -->
+    <div id="leaflet-map" class="rounded-sm overflow-hidden border border-white/10" style="height:500px;"></div>
+
+    <!-- Step thumbnails -->
+    <div id="step-rail" class="flex gap-1.5 mt-4 overflow-x-auto pb-2 scrollbar-none"></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="bg-stone border-t border-white/5 py-12 px-6 text-center">
+  <p class="font-serif text-gold/60 text-lg mb-2">忠武公 李舜臣</p>
+  <p class="text-mist/30 text-xs tracking-widest">1545 — 1598 · 조선 수군 삼도통제사</p>
+  <p class="text-mist/20 text-xs mt-6">교육·참고 목적으로 제작된 페이지입니다.</p>
+</footer>
+
+<script>
+/* ── BATTLE DATA ── */
+var battles = [
+  {id:1,  name:"옥포해전",       year:"1592.05.07", lat:34.880, lng:128.623, win:true,  ships:"왜선 26척 격침",    desc:"이순신 첫 출전. 임진왜란 최초 해전 대승."},
+  {id:2,  name:"합포해전",       year:"1592.05.07", lat:35.180, lng:128.420, win:true,  ships:"왜선 5척 격파",     desc:"옥포 당일 연속 출격."},
+  {id:3,  name:"적진포해전",     year:"1592.05.08", lat:34.928, lng:128.481, win:true,  ships:"왜선 11척 격파",    desc:"3연승으로 남해 제해권 장악 시작."},
+  {id:4,  name:"사천해전",       year:"1592.05.29", lat:34.920, lng:127.924, win:true,  ships:"왜선 13척 격파",    desc:"거북선 첫 출전. 이순신 어깨 총상."},
+  {id:5,  name:"당포해전",       year:"1592.06.02", lat:34.802, lng:128.102, win:true,  ships:"왜선 21척 격파",    desc:"왜장 구루지마 사살."},
+  {id:6,  name:"당항포해전",     year:"1592.06.05", lat:34.798, lng:128.299, win:true,  ships:"왜선 26척 격파",    desc:"왜군 내륙 보급로 차단."},
+  {id:7,  name:"율포해전",       year:"1592.06.07", lat:34.755, lng:128.578, win:true,  ships:"왜선 7척 격파",     desc:"거제도 인근 제해권 장악."},
+  {id:8,  name:"한산도대첩",     year:"1592.07.08", lat:34.795, lng:128.498, win:true,  ships:"왜선 59척 격파",    desc:"학익진 전술. 임진왜란 3대첩. 서해 진출 차단."},
+  {id:9,  name:"안골포해전",     year:"1592.07.10", lat:35.065, lng:128.720, win:true,  ships:"왜선 42척 격파",    desc:"한산도대첩 이틀 후 연속 대승."},
+  {id:10, name:"장림포해전",     year:"1592.08.29", lat:35.073, lng:128.954, win:true,  ships:"왜선 6척 격파",     desc:"부산 인근 압박."},
+  {id:11, name:"화준구미해전",   year:"1592.08.30", lat:35.094, lng:129.012, win:true,  ships:"왜선 5척 격파",     desc:"부산 바로 인근."},
+  {id:12, name:"다대포해전",     year:"1592.08.30", lat:35.058, lng:128.960, win:true,  ships:"왜선 8척 격파",     desc:"낙동강 하구 봉쇄."},
+  {id:13, name:"서평포해전",     year:"1592.08.30", lat:35.080, lng:128.977, win:true,  ships:"왜선 9척 격파",     desc:"부산 연속 해전."},
+  {id:14, name:"절영도해전",     year:"1592.08.30", lat:35.090, lng:129.055, win:true,  ships:"왜선 2척 격파",     desc:"영도 인근."},
+  {id:15, name:"부산포해전",     year:"1592.09.01", lat:35.105, lng:129.038, win:true,  ships:"왜선 100여 척 격파", desc:"부산 왜군 보급기지 대타격."},
+  {id:16, name:"웅포해전",       year:"1593.02",    lat:35.021, lng:128.691, win:true,  ships:"왜선 다수 격파",    desc:"수차례 압박 교전."},
+  {id:17, name:"2차 당항포해전", year:"1594.03",    lat:34.790, lng:128.305, win:true,  ships:"왜선 31척 격파",    desc:"왜군 재집결 분쇄."},
+  {id:18, name:"칠천량해전",     year:"1597.07.16", lat:34.815, lng:128.580, win:false, ships:"전선 160여 척 손실", desc:"원균 지휘. 조선 수군 거의 전멸. 이순신 부재 시."},
+  {id:19, name:"어란포해전",     year:"1597.08",    lat:34.484, lng:126.726, win:true,  ships:"왜선 격파",         desc:"이순신 복귀 후 첫 교전."},
+  {id:20, name:"벽파진해전",     year:"1597.09",    lat:34.543, lng:126.366, win:true,  ships:"왜선 수척 격파",    desc:"명량해전 직전 전초전."},
+  {id:21, name:"명량대첩",       year:"1597.09.16", lat:34.552, lng:126.308, win:true,  ships:"왜선 31척 격침",    desc:"13척 vs 330여 척. 임진왜란 3대첩. 역사상 최고의 역전극."},
+  {id:22, name:"고금도해전",     year:"1598.07",    lat:34.451, lng:126.717, win:true,  ships:"왜선 50여 척 격파", desc:"명나라 수군과 연합 작전."},
+  {id:23, name:"노량해전",       year:"1598.11.19", lat:34.878, lng:127.967, win:true,  ships:"왜선 200여 척 격파", desc:"마지막 해전. 이순신 전사. 임진왜란 종결."}
+];
+
+/* ── BATTLE TABLE ── */
+var tbody = document.getElementById('battle-table');
+battles.forEach(function(b) {
+  var tr = document.createElement('tr');
+  tr.className = 'border-t border-white/5 hover:bg-bark/40 transition-colors ' + (b.win ? '' : 'opacity-60');
+  tr.innerHTML =
+    '<td class="px-5 py-3 text-mist/30 font-mono text-xs">' + b.id + '</td>' +
+    '<td class="px-5 py-3 font-serif text-parch font-semibold">' + b.name + '</td>' +
+    '<td class="px-5 py-3 text-mist/50 text-xs font-mono">' + b.year + '</td>' +
+    '<td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-sm ' +
+      (b.win ? 'bg-gold/15 text-gold/80 border border-gold/25' : 'bg-rust/20 text-rust/80 border border-rust/30') +
+      '">' + (b.win ? '승전' : '패전') + '</span></td>' +
+    '<td class="px-5 py-3 text-mist/50 text-xs hidden md:table-cell">' + b.ships + '</td>';
+  tbody.appendChild(tr);
+});
+
+/* ── LEAFLET MAP + ANIMATED ROUTE ── */
+var map = L.map('leaflet-map', { center: [34.9, 128.0], zoom: 8 });
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 18
+}).addTo(map);
+
+L.polyline(battles.map(function(b){ return [b.lat, b.lng]; }), {
+  color: '#c9963a', weight: 1, opacity: 0.12, dashArray: '4 8'
+}).addTo(map);
+
+var currentStep  = -1;
+var isPlaying    = false;
+var playTimer    = null;
+var stepInterval = 1000;
+var drawnLine    = null;
+var drawnCoords  = [];
+var markers      = [];
+var shipMarker   = null;
+var big3         = ['\ud55c\uc0b0\ub3c4\ub300\ucca9', '\uba85\ub7c9\ub300\ucca9', '\ub178\ub7c9\ud574\uc804'];
+
+var rail = document.getElementById('step-rail');
+battles.forEach(function(b, i) {
+  var el = document.createElement('div');
+  el.id = 'rail-' + i;
+  el.title = b.name;
+  el.style.cssText = 'min-width:28px;height:28px;border-radius:50%;border:2px solid rgba(201,150,58,0.2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:monospace;color:rgba(232,226,214,0.25);flex-shrink:0;transition:all 0.2s;background:rgba(42,44,39,0.5);';
+  el.textContent = b.id;
+  el.addEventListener('click', (function(idx){ return function(){ jumpTo(idx); }; })(i));
+  rail.appendChild(el);
+});
+
+function makeShipIcon(win) {
+  var c = win ? '#f0d070' : '#e74c3c';
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><div style="width:22px;height:22px;background:'+c+';border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(240,215,112,0.25),0 0 14px rgba(240,215,112,0.5);"><svg width="12" height="12" viewBox="0 0 24 24" fill="#0e0f0d"><path d="M3 13h2l1 5h12l1-5h2l-2-6H5L3 13zM8 7V4h8v3"/></svg></div></div>',
+    iconSize: [22, 22], iconAnchor: [11, 11]
+  });
+}
+
+function makePastIcon(b, active) {
+  var isBig = big3.indexOf(b.name) !== -1;
+  var sz  = active ? (isBig ? 22 : 16) : (isBig ? 16 : 11);
+  var bg  = b.win ? '#c9963a' : '#8b3a2a';
+  var bdr = active ? (b.win ? '#f0d070' : '#e74c3c') : (b.win ? 'rgba(201,150,58,0.5)' : 'rgba(231,76,60,0.4)');
+  var glow= active ? (b.win ? '0 0 10px rgba(201,150,58,0.8)' : '0 0 10px rgba(231,76,60,0.8)') : 'none';
+  return L.divIcon({
+    className: '',
+    html: '<div style="width:'+sz+'px;height:'+sz+'px;background:'+bg+';border:2px solid '+bdr+';border-radius:50%;box-shadow:'+glow+';"></div>',
+    iconSize: [sz, sz], iconAnchor: [sz/2, sz/2]
+  });
+}
+
+function popupHtml(b) {
+  return '<div style="font-weight:700;font-size:14px;color:'+(b.win?'#c9963a':'#e74c3c')+';margin-bottom:4px;">'+b.id+'. '+b.name+'</div>'+
+    '<div style="font-size:10px;color:rgba(232,226,214,0.45);margin-bottom:5px;font-family:monospace;">'+b.year+'</div>'+
+    '<div style="font-size:12px;color:rgba(232,226,214,0.7);line-height:1.6;margin-bottom:5px;">'+b.desc+'</div>'+
+    '<div style="font-size:11px;font-weight:700;color:'+(b.win?'#c9963a':'#e74c3c')+';"> '+(b.win?'\uc2b9\uc804':'\ud328\uc804')+' &middot; '+b.ships+'</div>';
+}
+
+function updateCard(b) {
+  document.getElementById('card-num').textContent   = String(b.id).padStart(2,'0');
+  document.getElementById('card-name').textContent  = b.name;
+  document.getElementById('card-year').textContent  = b.year;
+  document.getElementById('card-ships').textContent = b.ships;
+  document.getElementById('card-desc').textContent  = b.desc;
+  document.getElementById('card-desc').classList.remove('hidden');
+  var badge = document.getElementById('card-badge');
+  badge.textContent = b.win ? '\uc2b9\uc804' : '\ud328\uc804';
+  badge.className   = 'text-xs px-2 py-0.5 rounded-sm border ' +
+    (b.win ? 'bg-yellow-900/30 text-yellow-400 border-yellow-600/30' : 'bg-red-900/30 text-red-400 border-red-700/30');
+  badge.classList.remove('hidden');
+  document.getElementById('card-num').style.color = b.win ? '#c9963a' : '#e74c3c';
+}
+
+function updateProgress(step) {
+  document.getElementById('progress-bar').style.width = ((step + 1) / battles.length * 100) + '%';
+}
+
+function highlightRail(step) {
+  battles.forEach(function(_, i) {
+    var el = document.getElementById('rail-' + i);
+    if (!el) return;
+    if (i < step) {
+      el.style.background = 'rgba(201,150,58,0.2)';
+      el.style.borderColor = 'rgba(201,150,58,0.4)';
+      el.style.color = 'rgba(201,150,58,0.6)';
+      el.style.transform = '';
+    } else if (i === step) {
+      el.style.background = '#c9963a';
+      el.style.borderColor = '#f0d070';
+      el.style.color = '#0e0f0d';
+      el.style.transform = 'scale(1.2)';
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } else {
+      el.style.background = 'rgba(42,44,39,0.5)';
+      el.style.borderColor = 'rgba(201,150,58,0.2)';
+      el.style.color = 'rgba(232,226,214,0.25)';
+      el.style.transform = '';
+    }
+  });
+}
+
+function advanceTo(step) {
+  if (step >= battles.length) { pause(); return; }
+  currentStep = step;
+  var b = battles[step];
+  drawnCoords.push([b.lat, b.lng]);
+  if (drawnLine) map.removeLayer(drawnLine);
+  drawnLine = L.polyline(drawnCoords, { color: '#c9963a', weight: 2.5, opacity: 0.85 }).addTo(map);
+  if (shipMarker) map.removeLayer(shipMarker);
+  if (step > 0 && markers[step - 1]) {
+    markers[step - 1].setIcon(makePastIcon(battles[step - 1], false));
+    markers[step - 1].closePopup();
+  }
+  if (!markers[step]) {
+    markers[step] = L.marker([b.lat, b.lng], { icon: makePastIcon(b, true) })
+      .addTo(map).bindPopup(popupHtml(b), { maxWidth: 250 });
+  } else {
+    markers[step].setIcon(makePastIcon(b, true));
+  }
+  markers[step].openPopup();
+  shipMarker = L.marker([b.lat, b.lng], { icon: makeShipIcon(b.win), zIndexOffset: 1000 }).addTo(map);
+  map.flyTo([b.lat, b.lng], Math.max(map.getZoom(), 9), { duration: 0.8 });
+  updateCard(b);
+  updateProgress(step);
+  highlightRail(step);
+}
+
+function play() {
+  if (currentStep >= battles.length - 1) resetRoute();
+  isPlaying = true;
+  document.getElementById('icon-play').style.display  = 'none';
+  document.getElementById('icon-pause').style.display = 'block';
+  document.getElementById('btn-label').textContent    = '\uc77c\uc2dc\uc815\uc9c0';
+  function tick() {
+    advanceTo(currentStep + 1);
+    if (currentStep < battles.length - 1) {
+      playTimer = setTimeout(tick, stepInterval);
+    } else {
+      pause();
+    }
+  }
+  playTimer = setTimeout(tick, 0);
+}
+
+function pause() {
+  isPlaying = false;
+  clearTimeout(playTimer);
+  document.getElementById('icon-play').style.display  = 'block';
+  document.getElementById('icon-pause').style.display = 'none';
+  document.getElementById('btn-label').textContent    = '\uc7ac\uc0dd';
+}
+
+function togglePlay() { isPlaying ? pause() : play(); }
+
+function resetRoute() {
+  pause();
+  currentStep = -1;
+  drawnCoords = [];
+  if (drawnLine)  { map.removeLayer(drawnLine);  drawnLine  = null; }
+  if (shipMarker) { map.removeLayer(shipMarker); shipMarker = null; }
+  markers.forEach(function(m) { if (m) map.removeLayer(m); });
+  markers = [];
+  document.getElementById('progress-bar').style.width  = '0%';
+  document.getElementById('card-num').textContent       = '\u2014';
+  document.getElementById('card-name').textContent      = '\uc7ac\uc0dd\uc744 \ub208\ub7ec \uacbd\ub85c\ub97c \uc2dc\uc791\ud558\uc138\uc694';
+  document.getElementById('card-year').textContent      = '';
+  document.getElementById('card-ships').textContent     = '';
+  document.getElementById('card-desc').classList.add('hidden');
+  document.getElementById('card-badge').classList.add('hidden');
+  document.getElementById('card-num').style.color       = 'rgba(201,150,58,0.3)';
+  map.flyTo([34.9, 128.0], 8, { duration: 1 });
+  battles.forEach(function(_, i) {
+    var el = document.getElementById('rail-' + i);
+    if (!el) return;
+    el.style.background = 'rgba(42,44,39,0.5)';
+    el.style.borderColor = 'rgba(201,150,58,0.2)';
+    el.style.color = 'rgba(232,226,214,0.25)';
+    el.style.transform = '';
+  });
+}
+
+function jumpTo(step) {
+  pause();
+  if (drawnLine)  { map.removeLayer(drawnLine);  drawnLine  = null; }
+  if (shipMarker) { map.removeLayer(shipMarker); shipMarker = null; }
+  markers.forEach(function(m) { if (m) map.removeLayer(m); });
+  markers = []; drawnCoords = []; currentStep = -1;
+  for (var i = 0; i <= step; i++) {
+    var b = battles[i];
+    drawnCoords.push([b.lat, b.lng]);
+    var active = (i === step);
+    var m = L.marker([b.lat, b.lng], { icon: makePastIcon(b, active) }).addTo(map).bindPopup(popupHtml(b), { maxWidth: 250 });
+    markers[i] = m;
+  }
+  if (drawnLine) map.removeLayer(drawnLine);
+  drawnLine = L.polyline(drawnCoords, { color: '#c9963a', weight: 2.5, opacity: 0.85 }).addTo(map);
+  markers[step].openPopup();
+  var bs = battles[step];
+  shipMarker = L.marker([bs.lat, bs.lng], { icon: makeShipIcon(bs.win), zIndexOffset: 1000 }).addTo(map);
+  map.flyTo([bs.lat, bs.lng], 9, { duration: 0.6 });
+  currentStep = step;
+  updateCard(bs);
+  updateProgress(step);
+  highlightRail(step);
+}
+
+function seekTo(e) {
+  var rect  = document.getElementById('progress-track').getBoundingClientRect();
+  var ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  var step  = Math.round(ratio * (battles.length - 1));
+  jumpTo(step);
+}
+
+function setSpeed(ms) {
+  stepInterval = ms;
+  ['slow','mid','fast'].forEach(function(k) {
+    var el = document.getElementById('spd-' + k);
+    el.style.borderColor = 'rgba(255,255,255,0.15)';
+    el.style.color       = 'rgba(232,226,214,0.4)';
+  });
+  var active = ms === 2000 ? 'slow' : ms === 1000 ? 'mid' : 'fast';
+  document.getElementById('spd-' + active).style.borderColor = 'rgba(201,150,58,0.5)';
+  document.getElementById('spd-' + active).style.color       = '#c9963a';
+}
+
+/* ── SCROLL EFFECTS ── */
+window.addEventListener('scroll', function() {
+  var nav = document.getElementById('nav');
+  if (window.scrollY > 60) nav.classList.add('scrolled');
+  else nav.classList.remove('scrolled');
+});
+
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e) {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.08 });
+
+document.querySelectorAll('.fade-section').forEach(function(el) {
+  observer.observe(el);
+});
+
+/* brush line trigger */
+var brushObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e) { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.5 });
+document.querySelectorAll('.brush-line').forEach(function(el) { brushObserver.observe(el); });
+</script>
+</body>
+</html>
